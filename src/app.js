@@ -2,7 +2,7 @@
 import express from 'express';
 import 'dotenv/config';
 
-import { pool } from './database/pool.js';
+import { db } from './database/database.js';
 
 // Repositories pg
 import { EntregasRepository }   from './repositories/EntregasRepository.js';
@@ -24,9 +24,9 @@ import { motoristasRoutes } from './routes/motoristasRoutes.js';
 import { relatoriosRoutes } from './routes/relatoriosRoutes.js';
 
 // ── Composição de dependências (único ponto) ─────────────────────────────────
-const entregasRepo   = new EntregasRepository(pool);
-const motoristasRepo = new MotoristasRepository(pool);
-const relatoriosRepo = new RelatoriosRepository(pool);
+const entregasRepo   = new EntregasRepository(db);
+const motoristasRepo = new MotoristasRepository(db);
+const relatoriosRepo = new RelatoriosRepository(db);
 
 const entregasService   = new EntregasService(entregasRepo, motoristasRepo);
 const motoristasService = new MotoristasService(motoristasRepo);
