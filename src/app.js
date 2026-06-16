@@ -1,50 +1,56 @@
-// Este arquivo é o ponto de entrada da aplicação, onde as dependências são compostas e o servidor Express é configurado e iniciado. Ele importa os repositórios, serviços, controladores e rotas, e os conecta para criar a aplicação funcional.
 import express from 'express';
-import 'dotenv/config';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import methodOverride from 'method-override';
+import session from 'express-session';
+import flash from 'express-flash';
 
-import { prisma } from './database/prisma.js';
+// Importa o arquivo central de rotas que criamos
+import rotas from './routes.js'; 
 
-import { EntregasRepository }   from './repositories/EntregasRepository.js';
-import { MotoristasRepository } from './repositories/MotoristasRepository.js';
-import { RelatoriosRepository } from './repositories/RelatoriosRepository.js';
-
-import { EntregasService }   from './services/EntregasService.js';
-import { MotoristasService } from './services/MotoristasService.js';
-
-import { EntregasController }   from './controllers/EntregasController.js';
-import { MotoristasController } from './controllers/MotoristasController.js';
-import { RelatoriosController } from './controllers/RelatoriosController.js';
-
-import { entregasRoutes }   from './routes/entregasRoutes.js';
-import { motoristasRoutes } from './routes/motoristasRoutes.js';
-import { relatoriosRoutes } from './routes/relatoriosRoutes.js';
-
-const entregasRepo   = new EntregasRepository(prisma);
-const motoristasRepo = new MotoristasRepository(prisma);
-const relatoriosRepo = new RelatoriosRepository(prisma);
-
-const entregasService   = new EntregasService(entregasRepo, motoristasRepo);
-const motoristasService = new MotoristasService(motoristasRepo);
-
-const entregasController   = new EntregasController(entregasService);
-const motoristasController = new MotoristasController(motoristasService, entregasService);
-const relatoriosController = new RelatoriosController(relatoriosRepo);
-
+// Declara o app UMA ÚNICA VEZ
 const app = express();
-app.use(express.json());
 
-app.use('/api/entregas',   entregasRoutes(entregasController));
-app.use('/api/motoristas', motoristasRoutes(motoristasController));
-app.use('/api/relatorios', relatoriosRoutes(relatoriosController));
+// Configuração de diretórios para ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use((err, req, res, next) => {
-  const status = err.statusCode ?? 500;
-  res.status(status).json({ erro: err.message });
-});
+// =======================================================
+// CONFIGURAÇÕES (EJS, Sessão, Flash)
+// =======================================================
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
-const PORT = process.env.PORT ?? 3000;
+app.use(session({
+    secret: 'segredo_do_delivery_tracker',
+    resave: false,
+    saveUninitialized: false
+}));
+app.use(flash());
+
+// =======================================================
+// MIDDLEWARES
+// =======================================================
+app.use(express.urlencoded({ extended: true })); 
+app.use(express.json()); // Mantém o suporte para as rotas /api responderem JSON
+
+app.use(methodOverride(function (req, res) {
+  if (req.body && typeof req.body === 'object' && '_method' in req.body) {
+    var method = req.body._method;
+    delete req.body._method;
+    return method;
+  }
+}));
+
+// =======================================================
+// ROTAS
+// =======================================================
+app.use(rotas);
+
+// =======================================================
+// START DO SERVIDOR
+// =======================================================
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Servidor rodando em: http://localhost:${PORT}`);
 });
-
-export default app;

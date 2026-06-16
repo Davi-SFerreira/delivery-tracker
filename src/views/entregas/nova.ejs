@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Nova Entrega</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <%- include('../partials/nav') %>
+    <%- include('../partials/flash') %>
+
+    <h2>Cadastrar Nova Entrega</h2>
+
+    <form action="/painel/entregas" method="POST" style="max-width: 400px;">
+        <div style="margin-bottom: 10px;">
+            <label>Descrição:</label><br>
+            <input type="text" name="descricao" value="<%= dadosAntigos.descricao || '' %>" required style="width: 100%;">
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+            <label>Origem:</label><br>
+            <input type="text" name="origem" value="<%= dadosAntigos.origem || '' %>" required style="width: 100%;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label>Destino:</label><br>
+            <input type="text" name="destino" value="<%= dadosAntigos.destino || '' %>" required style="width: 100%;">
+        </div>
+        
+        <button type="submit" style="padding: 10px 20px;">Salvar Entrega</button>
+        <a href="/painel/entregas" style="margin-left: 10px;">Cancelar</a>
+    </form>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><title>Detalhes da Entrega</title></head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <%- include('../partials/nav') %>
+    <%- include('../partials/flash') %>
+
+    <h2>Entrega #<%= entrega.id %> - <%= entrega.descricao %></h2>
+    <p><strong>Status:</strong> <span style="padding: 3px 6px; background: #ddd; border-radius: 4px;"><%= entrega.status %></span></p>
+    <p><strong>Origem:</strong> <%= entrega.origem %></p>
+    <p><strong>Destino:</strong> <%= entrega.destino %></p>
+    <p><strong>Motorista:</strong> <%= entrega.motorista ? entrega.motorista.nome : 'Não atribuído' %></p>
+
+    <div style="margin: 20px 0; display: flex; gap: 10px;">
+        <form action="/painel/entregas/<%= entrega.id %>/avancar" method="POST">
+            <input type="hidden" name="_method" value="PATCH">
+            <button type="submit">Avançar Status</button>
+        </form>
+        <form action="/painel/entregas/<%= entrega.id %>/cancelar" method="POST">
+            <input type="hidden" name="_method" value="PATCH">
+            <button type="submit" style="color: red;">Cancelar Entrega</button>
+        </form>
+    </div>
+
+    <h3>Histórico de Eventos</h3>
+    <ul>
+        <% entrega.historico.forEach(evento => { %>
+            <li>[<%= new Date(evento.createdAt).toLocaleString('pt-BR') %>] <%= evento.descricao %></li>
+        <% }) %>
+    </ul>
+    
+    <br>
+    <a href="/painel/entregas">Voltar para listagem</a>
+</body>
+</html> 

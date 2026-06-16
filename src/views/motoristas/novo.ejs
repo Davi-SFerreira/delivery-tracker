@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><title>Novo Motorista</title></head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <%- include('../partials/nav') %>
+    <%- include('../partials/flash') %>
+
+    <h2>Cadastrar Motorista</h2>
+    <form action="/painel/motoristas" method="POST" style="max-width: 400px;">
+        <div style="margin-bottom: 10px;">
+            <label>Nome:</label><br>
+            <input type="text" name="nome" value="<%= dadosAntigos.nome || '' %>" required style="width: 100%;">
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label>CPF:</label><br>
+            <input type="text" name="cpf" value="<%= dadosAntigos.cpf || '' %>" required style="width: 100%;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Placa do Veículo:</label><br>
+            <input type="text" name="placaVeiculo" value="<%= dadosAntigos.placaVeiculo || '' %>" required style="width: 100%;">
+        </div>
+        <button type="submit" style="padding: 10px 20px;">Salvar Motorista</button>
+        <a href="/painel/motoristas" style="margin-left: 10px;">Cancelar</a>
+    </form>
+</body>
+</html>

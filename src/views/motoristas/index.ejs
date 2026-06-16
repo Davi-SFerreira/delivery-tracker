@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><title>Painel - Motoristas</title></head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <%- include('../partials/nav') %>
+    <%- include('../partials/flash') %>
+
+    <h2>Motoristas Cadastrados</h2>
+    <a href="/painel/motoristas/novo"><button style="margin-bottom: 15px;">+ Novo Motorista</button></a>
+
+    <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; text-align: left;">
+        <tr style="background-color: #eee;">
+            <th>ID</th><th>Nome</th><th>CPF</th><th>Placa</th><th>Status</th>
+        </tr>
+        <% motoristas.forEach(motorista => { %>
+            <tr>
+                <td><%= motorista.id %></td>
+                <td><%= motorista.nome %></td>
+                <td><%= motorista.cpf %></td>
+                <td><%= motorista.placaVeiculo %></td>
+                <td><%= motorista.status %></td>
+            </tr>
+        <% }) %>
+    </table>
+</body>
+</html>
