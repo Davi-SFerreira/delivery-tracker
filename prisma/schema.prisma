@@ -1,13 +1,54 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// prisma/schema.prisma
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTA: SQLite não suporta enum nativo no Prisma.
+// Os valores válidos de status são restritos via validação no service
+// (camada que já garante isso desde a Atividade 05) e documentados aqui:
+// StatusEntrega:   CRIADA | EM_TRANSITO | ENTREGUE | CANCELADA
+// StatusMotorista: ATIVO | INATIVO
+
+model Motorista {
+  id           Int       @id @default(autoincrement())
+  nome         String
+  cpf          String    @unique
+  placaVeiculo String
+  status       String    @default("ATIVO")
+  entregas     Entrega[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("motoristas")
+}
+
+model Entrega {
+  id          Int             @id @default(autoincrement())
+  descricao   String
+  origem      String
+  destino     String
+  status      String          @default("CRIADA")
+  motorista   Motorista?      @relation(fields: [motoristaId], references: [id])
+  motoristaId Int?
+  historico   EventoEntrega[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("entregas")
+}
+
+model EventoEntrega {
+  id        Int      @id @default(autoincrement())
+  descricao String
+  entrega   Entrega  @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  entregaId Int
+  createdAt DateTime @default(now())
+
+  @@map("eventos_entrega")
 }

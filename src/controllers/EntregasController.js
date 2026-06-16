@@ -10,9 +10,13 @@ export class EntregasController {
       const filtros = {};
       if (req.query.status) filtros.status = req.query.status;
       if (req.query.motoristaId) filtros.motoristaId = Number(req.query.motoristaId);
+      if (req.query.createdDe) filtros.createdDe = req.query.createdDe;
+      if (req.query.createdAte) filtros.createdAte = req.query.createdAte;
+      if (req.query.page) filtros.page = req.query.page;
+      if (req.query.limit) filtros.limit = req.query.limit;
 
-      const entregas = await this.entregasService.listarTodos(filtros);
-      res.status(200).json(entregas);
+      const resultado = await this.entregasService.listarTodos(filtros);
+      res.status(200).json(resultado);
     } catch (err) {
       next(err);
     }
@@ -68,9 +72,7 @@ export class EntregasController {
 
   buscarHistorico = async (req, res, next) => {
     try {
-      const historico = await this.entregasService.buscarHistorico(
-        Number(req.params.id)
-      );
+      const historico = await this.entregasService.buscarHistorico(Number(req.params.id));
       res.status(200).json(historico);
     } catch (err) {
       next(err);

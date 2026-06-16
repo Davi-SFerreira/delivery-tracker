@@ -3,76 +3,78 @@
 import { IMotoristasRepository } from './contracts/IMotoristasRepository.js';
 import { CpfDuplicadoError } from '../utils/errors.js';
 
+const PRISMA_UNIQUE_VIOLATION = 'P2002';
+
 export class MotoristasRepository extends IMotoristasRepository {
-  constructor(db) {
+  constructor(prisma) {
     super();
-    this.db = db;
+    this.prisma = prisma;
   }
 
-  listarTodos() {
-    return this.db.prepare('SELECT * FROM motoristas ORDER BY id').all().map(this._toDomain);
+  async listarTodos() {
+    const registros = await this.prisma.motorista.findMany({ orderBy: { id: 'asc' } });
+    return registros.map((r) => this._toDomain(r));
   }
 
-  buscarPorId(id) {
-    const row = this.db.prepare('SELECT * FROM motoristas WHERE id = ?').get(id);
-    return row ? this._toDomain(row) : null;
+  async buscarPorId(id) {
+    const registro = await this.prisma.motorista.findUnique({ where: { id } });
+    return registro ? this._toDomain(registro) : null;
   }
 
-  buscarPorCPF(cpf) {
-    const row = this.db.prepare('SELECT * FROM motoristas WHERE cpf = ?').get(cpf);
-    return row ? this._toDomain(row) : null;
+  async buscarPorCPF(cpf) {
+    const registro = await this.prisma.motorista.findUnique({ where: { cpf } });
+    return registro ? this._toDomain(registro) : null;
   }
 
-  criar(dados) {
+  async criar(dados) {
     try {
-      const info = this.db.prepare(
-        `INSERT INTO motoristas (nome, cpf, placa_veiculo, status)
-         VALUES (?, ?, ?, ?)`
-      ).run(dados.nome, dados.cpf, dados.placaVeiculo, dados.status ?? 'ATIVO');
-
-      return this.buscarPorId(info.lastInsertRowid);
+      const registro = await this.prisma.motorista.create({
+        data: {
+          nome: dados.nome,
+          cpf: dados.cpf,
+          placaVeiculo: dados.placaVeiculo,
+          status: dados.status ?? 'ATIVO',
+        },
+      });
+      return this._toDomain(registro);
     } catch (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
+      if (err.code === PRISMA_UNIQUE_VIOLATION) {
         throw new CpfDuplicadoError(dados.cpf);
       }
       throw err;
     }
   }
 
-  atualizar(id, dados) {
-    const campos = [];
-    const valores = [];
-
-    if (dados.nome         !== undefined) { campos.push('nome = ?');          valores.push(dados.nome); }
-    if (dados.cpf          !== undefined) { campos.push('cpf = ?');           valores.push(dados.cpf); }
-    if (dados.placaVeiculo !== undefined) { campos.push('placa_veiculo = ?'); valores.push(dados.placaVeiculo); }
-    if (dados.status       !== undefined) { campos.push('status = ?');        valores.push(dados.status); }
-
-    if (campos.length === 0) return this.buscarPorId(id);
-
-    valores.push(id);
+  async atualizar(id, dados) {
+    const existente = await this.prisma.motorista.findUnique({ where: { id } });
+    if (!existente) return null;
 
     try {
-      const info = this.db
-        .prepare(`UPDATE motoristas SET ${campos.join(', ')} WHERE id = ?`)
-        .run(...valores);
-
-      return info.changes > 0 ? this.buscarPorId(id) : null;
+      const registro = await this.prisma.motorista.update({
+        where: { id },
+        data: {
+          ...(dados.nome !== undefined && { nome: dados.nome }),
+          ...(dados.cpf !== undefined && { cpf: dados.cpf }),
+          ...(dados.placaVeiculo !== undefined && { placaVeiculo: dados.placaVeiculo }),
+          ...(dados.status !== undefined && { status: dados.status }),
+        },
+      });
+      return this._toDomain(registro);
     } catch (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
+      if (err.code === PRISMA_UNIQUE_VIOLATION) {
         throw new CpfDuplicadoError(dados.cpf);
       }
       throw err;
     }
   }
 
-  _toDomain(row) {
+  _toDomain(registro) {
     return {
-      id: row.id,
-      nome: row.nome,
-      cpf: row.cpf,
-      placaVeiculo: row.placa_veiculo,
-      status: row.status,
+      id: registro.id,
+      nome: registro.nome,
+      cpf: registro.cpf,
+      placaVeiculo: registro.placaVeiculo,
+      status: registro.status,
     };
   }
 }

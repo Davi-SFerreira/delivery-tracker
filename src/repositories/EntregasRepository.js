@@ -1,130 +1,126 @@
-// Esse arquivo implementa a classe EntregasRepository.
+// src/repositories/EntregasRepository.js
 import { IEntregasRepository } from './contracts/IEntregasRepository.js';
 
 export class EntregasRepository extends IEntregasRepository {
-  constructor(db) {
+  constructor(prisma) {
     super();
-    this.db = db;
+    this.prisma = prisma;
   }
 
-  listarTodos(filtros = {}) {
-    const condicoes = [];
-    const valores = [];
+  async listarTodos(filtros = {}) {
+    const where = this._montarWhere(filtros);
 
-    if (filtros.status) {
-      condicoes.push('status = ?');
-      valores.push(filtros.status);
-    }
-    if (filtros.motoristaId) {
-      condicoes.push('motorista_id = ?');
-      valores.push(filtros.motoristaId);
-    }
+    const page = Math.max(1, Number(filtros.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(filtros.limit) || 10));
+    const skip = (page - 1) * limit;
 
-    let query = 'SELECT * FROM entregas';
-    if (condicoes.length > 0) {
-      query += ` WHERE ${condicoes.join(' AND ')}`;
-    }
-    query += ' ORDER BY id';
-
-    const rows = this.db.prepare(query).all(...valores);
-    return rows.map((row) => this._toDomain(row));
-  }
-
-  buscarPorId(id) {
-    const row = this.db.prepare('SELECT * FROM entregas WHERE id = ?').get(id);
-    return row ? this._toDomain(row) : null;
-  }
-
-  criar(dados) {
-    const stmt = this.db.prepare(
-      `INSERT INTO entregas (descricao, origem, destino, status, motorista_id)
-       VALUES (?, ?, ?, ?, ?)`
-    );
-
-    const info = stmt.run(
-      dados.descricao,
-      dados.origem,
-      dados.destino,
-      dados.status ?? 'CRIADA',
-      dados.motoristaId ?? null
-    );
-
-    const entregaId = info.lastInsertRowid;
-
-    const eventosIniciais = dados.historico ?? [
-      { descricao: 'Entrega criada', data: null },
-    ];
-
-    for (const evento of eventosIniciais) {
-      this._inserirEvento(entregaId, evento.descricao, evento.data ?? null);
-    }
-
-    return this.buscarPorId(entregaId);
-  }
-
-  atualizar(id, dados) {
-    const campos = [];
-    const valores = [];
-
-    if (dados.descricao !== undefined) { campos.push('descricao = ?');    valores.push(dados.descricao); }
-    if (dados.origem    !== undefined) { campos.push('origem = ?');       valores.push(dados.origem); }
-    if (dados.destino   !== undefined) { campos.push('destino = ?');      valores.push(dados.destino); }
-    if (dados.status    !== undefined) { campos.push('status = ?');       valores.push(dados.status); }
-    if (dados.motoristaId !== undefined) { campos.push('motorista_id = ?'); valores.push(dados.motoristaId); }
-
-    if (campos.length > 0) {
-      valores.push(id);
-      const info = this.db
-        .prepare(`UPDATE entregas SET ${campos.join(', ')} WHERE id = ?`)
-        .run(...valores);
-
-      if (info.changes === 0) return null;
-    } else {
-      if (!this.buscarPorId(id)) return null;
-    }
-
-    if (dados.novoEvento) {
-      this._inserirEvento(id, dados.novoEvento.descricao, dados.novoEvento.data ?? null);
-    }
-
-    if (Array.isArray(dados.historico)) {
-      for (const evento of dados.historico) {
-        this._inserirEvento(id, evento.descricao, evento.data ?? null);
-      }
-    }
-
-    return this.buscarPorId(id);
-  }
-
-  // ---------- helpers privados ----------
-
-  _inserirEvento(entregaId, descricao, data) {
-    this.db.prepare(
-      `INSERT INTO eventos_entrega (entrega_id, descricao, data)
-       VALUES (?, ?, COALESCE(?, datetime('now')))`
-    ).run(entregaId, descricao, data);
-  }
-
-  _toDomain(row) {
-    const eventos = this.db
-      .prepare(
-        `SELECT data, descricao FROM eventos_entrega
-         WHERE entrega_id = ?
-         ORDER BY data ASC, id ASC`
-      )
-      .all(row.id);
+    const [registros, total] = await Promise.all([
+      this.prisma.entrega.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { id: 'asc' },
+        include: { historico: true },
+      }),
+      this.prisma.entrega.count({ where }),
+    ]);
 
     return {
-      id: row.id,
-      descricao: row.descricao,
-      origem: row.origem,
-      destino: row.destino,
-      status: row.status,
-      motoristaId: row.motorista_id ?? null,
-      historico: eventos.map((e) => ({
-        data: e.data,
-        descricao: e.descricao,
-      })),
+      data: registros.map((r) => this._toDomain(r)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  async buscarPorId(id) {
+    const registro = await this.prisma.entrega.findUnique({
+      where: { id },
+      include: { historico: true },
+    });
+    return registro ? this._toDomain(registro) : null;
+  }
+
+  async criar(dados) {
+    const eventosIniciais = dados.historico ?? [{ descricao: 'Entrega criada' }];
+
+    const registro = await this.prisma.entrega.create({
+      data: {
+        descricao: dados.descricao,
+        origem: dados.origem,
+        destino: dados.destino,
+        status: dados.status ?? 'CRIADA',
+        motoristaId: dados.motoristaId ?? null,
+        historico: {
+          create: eventosIniciais.map((e) => ({ descricao: e.descricao })),
+        },
+      },
+      include: { historico: true },
+    });
+
+    return this._toDomain(registro);
+  }
+
+  async atualizar(id, dados) {
+    const existente = await this.prisma.entrega.findUnique({ where: { id } });
+    if (!existente) return null;
+
+    const dataUpdate = {};
+    if (dados.descricao !== undefined) dataUpdate.descricao = dados.descricao;
+    if (dados.origem !== undefined) dataUpdate.origem = dados.origem;
+    if (dados.destino !== undefined) dataUpdate.destino = dados.destino;
+    if (dados.status !== undefined) dataUpdate.status = dados.status;
+    if (dados.motoristaId !== undefined) dataUpdate.motoristaId = dados.motoristaId;
+
+    const novosEventos = [];
+    if (dados.novoEvento) novosEventos.push({ descricao: dados.novoEvento.descricao });
+    if (Array.isArray(dados.historico)) {
+      novosEventos.push(...dados.historico.map((e) => ({ descricao: e.descricao })));
+    }
+
+    if (novosEventos.length > 0) {
+      dataUpdate.historico = { create: novosEventos };
+    }
+
+    const registro = await this.prisma.entrega.update({
+      where: { id },
+      data: dataUpdate,
+      include: { historico: true },
+    });
+
+    return this._toDomain(registro);
+  }
+
+  _montarWhere(filtros) {
+    const where = {};
+
+    if (filtros.status) where.status = filtros.status;
+    if (filtros.motoristaId) where.motoristaId = Number(filtros.motoristaId);
+
+    if (filtros.createdDe || filtros.createdAte) {
+      where.createdAt = {};
+      if (filtros.createdDe) where.createdAt.gte = new Date(filtros.createdDe);
+      if (filtros.createdAte) where.createdAt.lte = new Date(filtros.createdAte);
+    }
+
+    return where;
+  }
+
+  _toDomain(registro) {
+    return {
+      id: registro.id,
+      descricao: registro.descricao,
+      origem: registro.origem,
+      destino: registro.destino,
+      status: registro.status,
+      motoristaId: registro.motoristaId,
+      historico: registro.historico
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+        .map((e) => ({
+          data: e.createdAt.toISOString(),
+          descricao: e.descricao,
+        })),
     };
   }
 }

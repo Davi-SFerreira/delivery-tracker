@@ -3,39 +3,38 @@
 const STATUS_VALIDOS = ['CRIADA', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA'];
 
 export class RelatoriosRepository {
-  constructor(db) {
-    this.db = db;
+  constructor(prisma) {
+    this.prisma = prisma;
   }
 
-  entregasPorStatus() {
-    const rows = this.db.prepare(
-      `SELECT status, COUNT(*) AS total FROM entregas GROUP BY status`
-    ).all();
+  async entregasPorStatus() {
+    const agrupado = await this.prisma.entrega.groupBy({
+      by: ['status'],
+      _count: { status: true },
+    });
 
     const resultado = Object.fromEntries(STATUS_VALIDOS.map((s) => [s, 0]));
-    for (const row of rows) {
-      resultado[row.status] = Number(row.total);
+    for (const item of agrupado) {
+      resultado[item.status] = item._count.status;
     }
     return resultado;
   }
 
-  motoristasAtivos() {
-    const rows = this.db.prepare(
-      `SELECT m.id          AS motorista_id,
-              m.nome        AS nome,
-              COUNT(e.id)   AS entregas_em_aberto
-       FROM motoristas m
-       JOIN entregas e ON e.motorista_id = m.id
-       WHERE e.status NOT IN ('ENTREGUE', 'CANCELADA')
-       GROUP BY m.id, m.nome
-       HAVING COUNT(e.id) > 0
-       ORDER BY m.id`
-    ).all();
+  async motoristasAtivos() {
+    const motoristas = await this.prisma.motorista.findMany({
+      include: {
+        entregas: {
+          where: { status: { notIn: ['ENTREGUE', 'CANCELADA'] } },
+        },
+      },
+    });
 
-    return rows.map((row) => ({
-      motoristaId: row.motorista_id,
-      nome: row.nome,
-      entregasEmAberto: Number(row.entregas_em_aberto),
-    }));
+    return motoristas
+      .filter((m) => m.entregas.length > 0)
+      .map((m) => ({
+        motoristaId: m.id,
+        nome: m.nome,
+        entregasEmAberto: m.entregas.length,
+      }));
   }
 }
