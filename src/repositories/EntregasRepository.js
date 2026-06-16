@@ -1,126 +1,78 @@
 // src/repositories/EntregasRepository.js
-import { IEntregasRepository } from './contracts/IEntregasRepository.js';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
-export class EntregasRepository extends IEntregasRepository {
-  constructor(prisma) {
-    super();
-    this.prisma = prisma;
-  }
+export class EntregasRepository {
+    async listarTodos(filtros = {}) {
+        const { status, motoristaId, page = 1, limit = 10, createdDe, createdAte } = filtros;
+        
+        const skip = (Number(page) - 1) * Number(limit);
+        const take = Number(limit);
 
-  async listarTodos(filtros = {}) {
-    const where = this._montarWhere(filtros);
+        const where = {};
+        
+        if (status) where.status = status;
+        if (motoristaId) where.motoristaId = Number(motoristaId);
+        
+        // Filtro opcional por intervalo de datas ISO 8601
+        if (createdDe || createdAte) {
+            where.createdAt = {};
+            if (createdDe) where.createdAt.gte = new Date(createdDe);
+            if (createdAte) where.createdAt.lte = new Date(createdAte);
+        }
 
-    const page = Math.max(1, Number(filtros.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(filtros.limit) || 10));
-    const skip = (page - 1) * limit;
+        // Promise.all executa as duas consultas simultaneamente para melhor performance
+        const [data, total] = await Promise.all([
+            prisma.entrega.findMany({
+                where,
+                skip,
+                take
+            }),
+            prisma.entrega.count({ where })
+        ]);
 
-    const [registros, total] = await Promise.all([
-      this.prisma.entrega.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { id: 'asc' },
-        include: { historico: true },
-      }),
-      this.prisma.entrega.count({ where }),
-    ]);
+        const totalPages = Math.ceil(total / take);
 
-    return {
-      data: registros.map((r) => this._toDomain(r)),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit) || 1,
-    };
-  }
-
-  async buscarPorId(id) {
-    const registro = await this.prisma.entrega.findUnique({
-      where: { id },
-      include: { historico: true },
-    });
-    return registro ? this._toDomain(registro) : null;
-  }
-
-  async criar(dados) {
-    const eventosIniciais = dados.historico ?? [{ descricao: 'Entrega criada' }];
-
-    const registro = await this.prisma.entrega.create({
-      data: {
-        descricao: dados.descricao,
-        origem: dados.origem,
-        destino: dados.destino,
-        status: dados.status ?? 'CRIADA',
-        motoristaId: dados.motoristaId ?? null,
-        historico: {
-          create: eventosIniciais.map((e) => ({ descricao: e.descricao })),
-        },
-      },
-      include: { historico: true },
-    });
-
-    return this._toDomain(registro);
-  }
-
-  async atualizar(id, dados) {
-    const existente = await this.prisma.entrega.findUnique({ where: { id } });
-    if (!existente) return null;
-
-    const dataUpdate = {};
-    if (dados.descricao !== undefined) dataUpdate.descricao = dados.descricao;
-    if (dados.origem !== undefined) dataUpdate.origem = dados.origem;
-    if (dados.destino !== undefined) dataUpdate.destino = dados.destino;
-    if (dados.status !== undefined) dataUpdate.status = dados.status;
-    if (dados.motoristaId !== undefined) dataUpdate.motoristaId = dados.motoristaId;
-
-    const novosEventos = [];
-    if (dados.novoEvento) novosEventos.push({ descricao: dados.novoEvento.descricao });
-    if (Array.isArray(dados.historico)) {
-      novosEventos.push(...dados.historico.map((e) => ({ descricao: e.descricao })));
+        return {
+            data,
+            total,
+            page: Number(page),
+            limit: take,
+            totalPages
+        };
     }
 
-    if (novosEventos.length > 0) {
-      dataUpdate.historico = { create: novosEventos };
+    async buscarPorId(id) {
+        return await prisma.entrega.findUnique({
+            where: { id: Number(id) },
+            include: { historico: true } 
+        });
     }
 
-    const registro = await this.prisma.entrega.update({
-      where: { id },
-      data: dataUpdate,
-      include: { historico: true },
+    async criar(dados) {
+        return await prisma.entrega.create({
+            data: dados
+        });
+    }
+
+async atualizar(id, dados) {
+    // 1. Extraímos o "novoEvento" e outros dados que podem quebrar o update
+    const { novoEvento, historico, motorista, id: idEntrega, createdAt, updatedAt, ...dadosLimpos } = dados;
+
+    // 2. Se o service enviou um 'novoEvento', traduzimos para o formato de relação do Prisma
+    if (novoEvento) {
+        dadosLimpos.historico = {
+            create: {
+                descricao: novoEvento.descricao
+                // O Prisma cuida da data de criação (createdAt) automaticamente graças ao @default(now())
+            }
+        };
+    }
+
+    // 3. Executamos o update limpo
+    return await prisma.entrega.update({
+        where: { id: Number(id) },
+        data: dadosLimpos
     });
-
-    return this._toDomain(registro);
-  }
-
-  _montarWhere(filtros) {
-    const where = {};
-
-    if (filtros.status) where.status = filtros.status;
-    if (filtros.motoristaId) where.motoristaId = Number(filtros.motoristaId);
-
-    if (filtros.createdDe || filtros.createdAte) {
-      where.createdAt = {};
-      if (filtros.createdDe) where.createdAt.gte = new Date(filtros.createdDe);
-      if (filtros.createdAte) where.createdAt.lte = new Date(filtros.createdAte);
-    }
-
-    return where;
-  }
-
-  _toDomain(registro) {
-    return {
-      id: registro.id,
-      descricao: registro.descricao,
-      origem: registro.origem,
-      destino: registro.destino,
-      status: registro.status,
-      motoristaId: registro.motoristaId,
-      historico: registro.historico
-        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-        .map((e) => ({
-          data: e.createdAt.toISOString(),
-          descricao: e.descricao,
-        })),
-    };
-  }
+} 
 }
