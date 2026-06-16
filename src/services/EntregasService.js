@@ -1,133 +1,94 @@
-// Serviço de negócios para gerenciamento de entregas
-
-import { RegraDeNegocioError } from '../utils/errors.js';
-
 export class EntregasService {
-  constructor(entregasRepository, motoristasRepository) {
-    this.entregasRepository = entregasRepository;
-    this.motoristasRepository = motoristasRepository;
-  }
-
-  async listarTodos(filtros = {}) {
-    return this.entregasRepository.listarTodos(filtros);
-  }
-
-  async buscarPorId(id) {
-    const entrega = await this.entregasRepository.buscarPorId(id);
-    if (!entrega) throw new RegraDeNegocioError(`Entrega ${id} não encontrada.`);
-    return entrega;
-  }
-
-  async criar(dados) {
-    const { descricao, origem, destino } = dados;
-
-    if (!descricao || !origem || !destino) {
-      throw new RegraDeNegocioError('Campos obrigatórios: descricao, origem, destino.');
+    constructor(entregasRepository, motoristasRepository) {
+        this.entregasRepository = entregasRepository;
+        this.motoristasRepository = motoristasRepository;
     }
 
-    if (origem === destino) {
-      throw new RegraDeNegocioError('Origem e destino não podem ser iguais.');
+    async listarTodos(filtros) {
+        return await this.entregasRepository.listarTodos(filtros);
     }
 
-    // Verifica duplicidade ativa
-    const todas = await this.entregasRepository.listarTodos();
-    const duplicada = todas.find(
-      (e) =>
-        e.descricao === descricao &&
-        e.origem === origem &&
-        e.destino === destino &&
-        !['ENTREGUE', 'CANCELADA'].includes(e.status)
-    );
-    if (duplicada) {
-      throw new RegraDeNegocioError('Já existe uma entrega ativa com esses dados.');
+    async buscarPorId(id) {
+        return await this.entregasRepository.buscarPorId(id);
     }
 
-    return this.entregasRepository.criar({
-      descricao,
-      origem,
-      destino,
-      status: 'CRIADA',
-      historico: [{ descricao: 'Entrega criada', data: new Date().toISOString() }],
-    });
-  }
+    async criar(dados) {
+        if (dados.origem === dados.destino) {
+            throw new Error('Origem e destino não podem ser iguais.');
+        }
 
-  async avancarStatus(id) {
-    const entrega = await this.buscarPorId(id);
+        const todas = await this.entregasRepository.listarTodos();
+        const duplicada = todas.find(e => 
+            e.descricao === dados.descricao && 
+            e.origem === dados.origem && 
+            e.destino === dados.destino && 
+            e.status !== 'ENTREGUE' && 
+            e.status !== 'CANCELADA'
+        );
+        
+        if (duplicada) {
+            throw new Error('Entrega duplicada ativa já existe.');
+        }
 
-    const transicoes = {
-      CRIADA: 'EM_TRANSITO',
-      EM_TRANSITO: 'ENTREGUE',
-    };
+        const novaEntrega = {
+            ...dados,
+            status: 'CRIADA',
+            historico: {
+                create: [{ descricao: 'Entrega criada no sistema.' }]
+            }
+        };
 
-    const proximo = transicoes[entrega.status];
-    if (!proximo) {
-      throw new RegraDeNegocioError(
-        `Não é possível avançar o status de uma entrega ${entrega.status}.`
-      );
+        return await this.entregasRepository.criar(novaEntrega);
     }
 
-    const novoEvento = {
-      descricao: `Status alterado para ${proximo}`,
-      data: new Date().toISOString(),
-    };
+    async avancar(id) {
+        const entrega = await this.entregasRepository.buscarPorId(id);
+        if (!entrega) throw new Error('Entrega não encontrada.');
 
-    return this.entregasRepository.atualizar(id, {
-      status: proximo,
-      novoEvento,
-    });
-  }
+        let novoStatus;
+        let descricaoEvento;
 
-  async cancelar(id) {
-    const entrega = await this.buscarPorId(id);
+        if (entrega.status === 'CRIADA') {
+            novoStatus = 'EM_TRANSITO';
+            descricaoEvento = 'Status alterado para EM_TRANSITO';
+        } else if (entrega.status === 'EM_TRANSITO') {
+            novoStatus = 'ENTREGUE';
+            descricaoEvento = 'Entrega finalizada com sucesso';
+        } else {
+            throw new Error('Não é possível avançar o status desta entrega.');
+        }
 
-    if (['ENTREGUE', 'CANCELADA'].includes(entrega.status)) {
-      throw new RegraDeNegocioError(
-        `Não é possível cancelar uma entrega ${entrega.status}.`
-      );
+        return await this.entregasRepository.atualizar(id, {
+            status: novoStatus,
+            novoEvento: { descricao: descricaoEvento }
+        });
     }
 
-    const novoEvento = {
-      descricao: 'Entrega cancelada',
-      data: new Date().toISOString(),
-    };
+    async cancelar(id) {
+        const entrega = await this.entregasRepository.buscarPorId(id);
+        if (!entrega) throw new Error('Entrega não encontrada.');
+        if (entrega.status === 'ENTREGUE' || entrega.status === 'CANCELADA') {
+            throw new Error('Não é possível cancelar esta entrega.');
+        }
 
-    return this.entregasRepository.atualizar(id, {
-      status: 'CANCELADA',
-      novoEvento,
-    });
-  }
-
-  async atribuirMotorista(id, motoristaId) {
-    const entrega = await this.buscarPorId(id);
-
-    if (entrega.status !== 'CRIADA') {
-      throw new RegraDeNegocioError(
-        'Só é possível atribuir motorista a entregas com status CRIADA.'
-      );
+        return await this.entregasRepository.atualizar(id, {
+            status: 'CANCELADA',
+            novoEvento: { descricao: 'Entrega cancelada.' }
+        });
     }
 
-    const motorista = await this.motoristasRepository.buscarPorId(motoristaId);
-    if (!motorista) {
-      throw new RegraDeNegocioError(`Motorista ${motoristaId} não encontrado.`);
+    async atribuir(id, motoristaId) {
+        const entrega = await this.entregasRepository.buscarPorId(id);
+        if (!entrega) throw new Error('Entrega não encontrada.');
+        if (entrega.status !== 'CRIADA') throw new Error('Só é possível atribuir motorista para entregas CRIADAS.');
+
+        const motorista = await this.motoristasRepository.buscarPorId(motoristaId);
+        if (!motorista) throw new Error('Motorista não encontrado.');
+        if (motorista.status !== 'ATIVO') throw new Error('Motorista inativo.');
+
+        return await this.entregasRepository.atualizar(id, {
+            motoristaId: Number(motoristaId),
+            novoEvento: { descricao: `Motorista ${motorista.nome} atribuído.` }
+        });
     }
-
-    if (motorista.status !== 'ATIVO') {
-      throw new RegraDeNegocioError('Não é possível atribuir um motorista INATIVO.');
-    }
-
-    const novoEvento = {
-      descricao: `Motorista ${motorista.nome} atribuído à entrega`,
-      data: new Date().toISOString(),
-    };
-
-    return this.entregasRepository.atualizar(id, {
-      motoristaId,
-      novoEvento,
-    });
-  }
-
-  async buscarHistorico(id) {
-    const entrega = await this.buscarPorId(id);
-    return entrega.historico;
-  }
 }
