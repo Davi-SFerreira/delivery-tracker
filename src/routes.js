@@ -1,20 +1,27 @@
 import { Router } from 'express';
 
-// 1. Repositories (Prisma)
+// Repositories
 import { EntregasRepository } from './repositories/EntregasRepository.js';
 import { MotoristasRepository } from './repositories/MotoristasRepository.js';
+import { UsuariosRepository } from './repositories/UsuariosRepository.js';
 
-// 2. Services (Regras de negócio)
+// Services
 import { EntregasService } from './services/EntregasService.js';
 import { MotoristasService } from './services/MotoristasService.js';
+import { AuthService } from './services/AuthService.js';
 
-// 3. Controllers da API REST (Respondem JSON)
+// Controllers API
 import { EntregasController as EntregasControllerAPI } from './controllers/api/EntregasController.js';
 import { MotoristasController as MotoristasControllerAPI } from './controllers/api/MotoristasController.js';
+import { AuthController } from './controllers/api/AuthController.js';
 
-// 4. Controllers do Painel Administrativo (Respondem res.render EJS)
+// Controllers Painel
 import { EntregasControllerPainel } from './controllers/painel/EntregasController.js';
 import { MotoristasControllerPainel } from './controllers/painel/MotoristasController.js';
+
+// Middlewares de Segurança
+import { autenticar } from './middlewares/autenticar.js';
+import { autorizar } from './middlewares/autorizar.js';
 
 const rotas = Router();
 
@@ -23,39 +30,50 @@ const rotas = Router();
 // =======================================================
 const entregasRepo = new EntregasRepository();
 const motoristasRepo = new MotoristasRepository();
+const usuariosRepo = new UsuariosRepository();
 
 const entregasService = new EntregasService(entregasRepo, motoristasRepo);
 const motoristasService = new MotoristasService(motoristasRepo);
+const authService = new AuthService(usuariosRepo);
 
-// Injetamos os MESMOS services em controllers diferentes [cite: 72]
 const entregasControllerAPI = new EntregasControllerAPI(entregasService);
 const motoristasControllerAPI = new MotoristasControllerAPI(motoristasService);
+const authController = new AuthController(authService);
 
 const entregasControllerPainel = new EntregasControllerPainel(entregasService);
 const motoristasControllerPainel = new MotoristasControllerPainel(motoristasService);
 
 
 // =======================================================
-// ROTAS DA API REST (Intactas - Retornam JSON)
-// =======================================================
-rotas.get('/api/entregas', (req, res) => entregasControllerAPI.listarTodos(req, res));
-rotas.post('/api/entregas', (req, res) => entregasControllerAPI.criar(req, res));
-rotas.get('/api/entregas/:id', (req, res) => entregasControllerAPI.buscarPorId(req, res));
-rotas.patch('/api/entregas/:id/avancar', (req, res) => entregasControllerAPI.avancar(req, res));
-rotas.patch('/api/entregas/:id/cancelar', (req, res) => entregasControllerAPI.cancelar(req, res));
-rotas.patch('/api/entregas/:id/atribuir', (req, res) => entregasControllerAPI.atribuir(req, res));
-
-rotas.get('/api/motoristas', (req, res) => motoristasControllerAPI.listarTodos(req, res));
-rotas.post('/api/motoristas', (req, res) => motoristasControllerAPI.criar(req, res));
-rotas.get('/api/motoristas/:id', (req, res) => motoristasControllerAPI.buscarPorId(req, res));
-rotas.get('/api/motoristas/:id/entregas', (req, res) => motoristasControllerAPI.listarEntregas(req, res));
-
-
-// =======================================================
-// ROTAS DO PAINEL ADMINISTRATIVO (EJS - Renderizam HTML)
+// ROTAS DA API REST
 // =======================================================
 
-// Entregas Painel (Padrão PRG e Method Override) [cite: 44-46, 52-54]
+// Públicas
+rotas.post('/api/auth/registrar', (req, res) => authController.registrar(req, res));
+rotas.post('/api/auth/login', (req, res) => authController.login(req, res));
+
+// Rotas de Entregas Protegidas
+rotas.get('/api/entregas', autenticar, (req, res) => entregasControllerAPI.listarTodos(req, res));
+rotas.post('/api/entregas', autenticar, (req, res) => entregasControllerAPI.criar(req, res));
+rotas.get('/api/entregas/:id', autenticar, (req, res) => entregasControllerAPI.buscarPorId(req, res));
+rotas.patch('/api/entregas/:id/avancar', autenticar, (req, res) => entregasControllerAPI.avancar(req, res));
+rotas.patch('/api/entregas/:id/atribuir', autenticar, (req, res) => entregasControllerAPI.atribuir(req, res));
+
+// Apenas GESTOR
+rotas.patch('/api/entregas/:id/cancelar', autenticar, autorizar('GESTOR'), (req, res) => entregasControllerAPI.cancelar(req, res));
+
+// Rotas de Motoristas Protegidas
+rotas.get('/api/motoristas', autenticar, (req, res) => motoristasControllerAPI.listarTodos(req, res));
+rotas.get('/api/motoristas/:id', autenticar, (req, res) => motoristasControllerAPI.buscarPorId(req, res));
+rotas.get('/api/motoristas/:id/entregas', autenticar, (req, res) => motoristasControllerAPI.listarEntregas(req, res));
+
+// Apenas GESTOR
+rotas.post('/api/motoristas', autenticar, autorizar('GESTOR'), (req, res) => motoristasControllerAPI.criar(req, res));
+
+
+// =======================================================
+// ROTAS DO PAINEL ADMINISTRATIVO (Sem proteção no momento)
+// =======================================================
 rotas.get('/painel/entregas', (req, res) => entregasControllerPainel.index(req, res));
 rotas.get('/painel/entregas/nova', (req, res) => entregasControllerPainel.nova(req, res));
 rotas.post('/painel/entregas', (req, res) => entregasControllerPainel.criar(req, res));
@@ -63,13 +81,10 @@ rotas.get('/painel/entregas/:id', (req, res) => entregasControllerPainel.detalhe
 rotas.patch('/painel/entregas/:id/avancar', (req, res) => entregasControllerPainel.avancar(req, res));
 rotas.patch('/painel/entregas/:id/cancelar', (req, res) => entregasControllerPainel.cancelar(req, res));
 
-// Motoristas Painel (Listagem e Cadastro) [cite: 55-57]
 rotas.get('/painel/motoristas', (req, res) => motoristasControllerPainel.index(req, res));
 rotas.get('/painel/motoristas/novo', (req, res) => motoristasControllerPainel.novo(req, res));
 rotas.post('/painel/motoristas', (req, res) => motoristasControllerPainel.criar(req, res));
 
-// Redirecionamento da raiz direto para o painel
 rotas.get('/', (req, res) => res.redirect('/painel/entregas'));
 
-// Exportação padrão necessária para o app.js ler o arquivo
 export default rotas;

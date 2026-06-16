@@ -1,81 +1,62 @@
-// Controlador para gerenciar as rotas relacionadas às entregas
-
 export class EntregasController {
-  constructor(entregasService) {
-    this.entregasService = entregasService;
-  }
-
-  listarTodos = async (req, res, next) => {
-    try {
-      const filtros = {};
-      if (req.query.status) filtros.status = req.query.status;
-      if (req.query.motoristaId) filtros.motoristaId = Number(req.query.motoristaId);
-      if (req.query.createdDe) filtros.createdDe = req.query.createdDe;
-      if (req.query.createdAte) filtros.createdAte = req.query.createdAte;
-      if (req.query.page) filtros.page = req.query.page;
-      if (req.query.limit) filtros.limit = req.query.limit;
-
-      const resultado = await this.entregasService.listarTodos(filtros);
-      res.status(200).json(resultado);
-    } catch (err) {
-      next(err);
+    constructor(entregasService) {
+        this.entregasService = entregasService;
     }
-  };
 
-  buscarPorId = async (req, res, next) => {
-    try {
-      const entrega = await this.entregasService.buscarPorId(Number(req.params.id));
-      res.status(200).json(entrega);
-    } catch (err) {
-      next(err);
+    async listarTodos(req, res) {
+        try {
+            const entregas = await this.entregasService.listarTodos(req.query);
+            return res.status(200).json(entregas);
+        } catch (erro) {
+            return res.status(400).json({ erro: erro.message });
+        }
     }
-  };
 
-  criar = async (req, res, next) => {
-    try {
-      const entrega = await this.entregasService.criar(req.body);
-      res.status(201).json(entrega);
-    } catch (err) {
-      next(err);
+    async buscarPorId(req, res) {
+        try {
+            const entrega = await this.entregasService.buscarPorId(req.params.id);
+            if (!entrega) return res.status(404).json({ erro: 'Entrega não encontrada' });
+            return res.status(200).json(entrega);
+        } catch (erro) {
+            return res.status(400).json({ erro: erro.message });
+        }
     }
-  };
 
-  avancarStatus = async (req, res, next) => {
-    try {
-      const entrega = await this.entregasService.avancarStatus(Number(req.params.id));
-      res.status(200).json(entrega);
-    } catch (err) {
-      next(err);
+    async criar(req, res) {
+        try {
+            // Injetamos o id do usuario autenticado que veio do middleware
+            const dados = { ...req.body, criadorId: req.usuario.id };
+            const novaEntrega = await this.entregasService.criar(dados);
+            return res.status(201).json(novaEntrega);
+        } catch (erro) {
+            return res.status(400).json({ erro: erro.message });
+        }
     }
-  };
 
-  cancelar = async (req, res, next) => {
-    try {
-      const entrega = await this.entregasService.cancelar(Number(req.params.id));
-      res.status(200).json(entrega);
-    } catch (err) {
-      next(err);
+    async avancar(req, res) {
+        try {
+            const entrega = await this.entregasService.avancar(req.params.id);
+            return res.status(200).json(entrega);
+        } catch (erro) {
+            return res.status(422).json({ erro: erro.message });
+        }
     }
-  };
 
-  atribuirMotorista = async (req, res, next) => {
-    try {
-      const entrega = await this.entregasService.atribuirMotorista(
-        Number(req.params.id),
-        Number(req.body.motoristaId)
-      );
-      res.status(200).json(entrega);
-    } catch (err) {
-      next(err);
+    async cancelar(req, res) {
+        try {
+            const entrega = await this.entregasService.cancelar(req.params.id);
+            return res.status(200).json(entrega);
+        } catch (erro) {
+            return res.status(422).json({ erro: erro.message });
+        }
     }
-  };
 
-  buscarHistorico = async (req, res, next) => {
-    try {
-      const historico = await this.entregasService.buscarHistorico(Number(req.params.id));
-      res.status(200).json(historico);
-    } catch (err) {
-      next(err);
+    async atribuir(req, res) {
+        try {
+            const entrega = await this.entregasService.atribuir(req.params.id, req.body.motoristaId);
+            return res.status(200).json(entrega);
+        } catch (erro) {
+            return res.status(422).json({ erro: erro.message });
+        }
     }
-  };
 }
