@@ -19,11 +19,12 @@ export default defineConfig({
     },
   ],
 
+// No seu frontend/playwright.config.js
   webServer: {
-    command: 'node src/app.js', 
+    command: 'node --env-file=.env src/app.js', // O Node garante a injeção do .env na raiz
     url: 'http://localhost:3000/painel/entregas',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
-    cwd: '../', // ISSO AQUI RESOLVE O ERRO: Força o servidor a rodar na raiz para ler o .env
+    cwd: '../', // Mantém a execução a partir da raiz do projeto
   },
 });

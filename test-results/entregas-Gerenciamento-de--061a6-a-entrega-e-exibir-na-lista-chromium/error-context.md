@@ -72,7 +72,7 @@ Timeout: 5000ms
 Call log:
   - Expect "toContainText" with timeout 5000ms
   - waiting for locator('body')
-    13 × locator resolved to <body>…</body>
+    14 × locator resolved to <body>…</body>
        - unexpected value "
     
     Delivery Tracker - Painel Interno |
@@ -136,7 +136,7 @@ Validation Error Count: 1
 - text: "Invalid `prisma.entrega.findMany()` invocation: error: Environment variable not found: DATABASE_URL. --> schema.prisma:7 | 6 | provider = \"postgresql\" 7 | url = env(\"DATABASE_URL\") | Validation Error Count: 1"
 - heading "Cadastrar Nova Entrega" [level=2]
 - text: "Descrição:"
-- textbox: Pacote E2E - 1781654102627
+- textbox: Pacote E2E - 1781654433608
 - text: "Origem:"
 - textbox: Recife
 - text: "Destino:"
