@@ -8,7 +8,7 @@ describe('EntregasService - Testes Unitários', () => {
 
     beforeEach(() => {
         entregasRepositoryMock = {
-            listarTodos: jest.fn().mockResolvedValue([]), // Retorna array vazio para evitar o erro .find()
+            listarTodos: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 10, totalPages: 1 }),
             buscarPorId: jest.fn(),
             criar: jest.fn(),
             atualizar: jest.fn()

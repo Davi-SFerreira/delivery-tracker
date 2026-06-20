@@ -4,21 +4,24 @@ export class EntregasControllerPainel {
     }
 
     async index(req, res) {
-        try {
-            // Busca as entregas através do Service (reaproveitando a lógica REST)
-            const resultado = await this.entregasService.listarTodos(req.query);
-            
-            // Renderiza a view passando as entregas e as mensagens flash
-            res.render('entregas/index', { 
-                entregas: resultado.data,
-                metadados: resultado
-            });
-        } catch (erro) {
-            console.error('ERRO REAL NO INDEX:', erro); //temporário
-            req.flash('erro', 'Ocorreu um erro ao buscar as entregas.');
-            res.render('entregas/index', { entregas: [], metadados: { total: 0, page: 1, totalPages: 1 } });
-        }
+    try {
+        // Busca as entregas através do Service (reaproveitando a lógica REST)
+        const resultado = await this.entregasService.listarTodos({
+            ...req.query,
+            limit: req.query.limit || 100,
+        });
+        
+        // Renderiza a view passando as entregas e as mensagens flash
+        res.render('entregas/index', { 
+            entregas: resultado.data,
+            metadados: resultado
+        });
+    } catch (erro) {
+        console.error('ERRO REAL NO INDEX:', erro); // temporário
+        req.flash('erro', 'Ocorreu um erro ao buscar as entregas.');
+        res.render('entregas/index', { entregas: [], metadados: { total: 0, page: 1, totalPages: 1 } });
     }
+}
 
     async nova(req, res) {
         // Se houver um erro de validação, resgatamos os dados enviados anteriormente

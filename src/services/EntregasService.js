@@ -17,7 +17,7 @@ export class EntregasService {
             throw new Error('Origem e destino não podem ser iguais.');
         }
 
-        const todas = await this.entregasRepository.listarTodos();
+        const { data: todas } = await this.entregasRepository.listarTodos();
         const duplicada = todas.find(e => 
             e.descricao === dados.descricao && 
             e.origem === dados.origem && 
