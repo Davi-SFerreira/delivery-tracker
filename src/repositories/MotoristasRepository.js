@@ -1,34 +1,34 @@
-// src/repositories/MotoristasRepository.js
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 export class MotoristasRepository {
-    async listarTodos() {
-        return await prisma.motorista.findMany();
-    }
+  constructor(prisma) {
+    this.prisma = prisma;
+  }
 
-    async buscarPorId(id) {
-        return await prisma.motorista.findUnique({
-            where: { id: Number(id) }
-        });
-    }
+  async listarTodos() {
+    return await this.prisma.motorista.findMany();
+  }
 
-    async buscarPorCPF(cpf) {
-        return await prisma.motorista.findUnique({
-            where: { cpf }
-        });
-    }
+  async buscarPorId(id) {
+    return await this.prisma.motorista.findUnique({
+      where: { id: Number(id) },
+    });
+  }
 
-    async criar(dados) {
-        return await prisma.motorista.create({
-            data: dados
-        });
-    }
+  async buscarPorCPF(cpf) {
+    return await this.prisma.motorista.findUnique({
+      where: { cpf },
+    });
+  }
 
-    async atualizar(id, dados) {
-        return await prisma.motorista.update({
-            where: { id: Number(id) },
-            data: dados
-        });
-    }
+  async criar(dados) {
+    return await this.prisma.motorista.create({
+      data: dados,
+    });
+  }
+
+  async atualizar(id, dados) {
+    return await this.prisma.motorista.update({
+      where: { id: Number(id) },
+      data: dados,
+    });
+  }
 }

@@ -1,5 +1,4 @@
 // Controlador para gerenciar motoristas e suas entregas
-
 export class MotoristasController {
   constructor(motoristasService, entregasService) {
     this.motoristasService = motoristasService;
@@ -35,11 +34,22 @@ export class MotoristasController {
     }
   };
 
+  atualizar = async (req, res, next) => {
+    try {
+      const motorista = await this.motoristasService.atualizar(
+        Number(req.params.id),
+        req.body
+      );
+      res.status(200).json(motorista);
+    } catch (err) {
+      next(err);
+    }
+  };
+
   listarEntregas = async (req, res, next) => {
     try {
       const filtros = {};
       if (req.query.status) filtros.status = req.query.status;
-
       const entregas = await this.entregasService.listarTodos({
         ...filtros,
         motoristaId: Number(req.params.id),
