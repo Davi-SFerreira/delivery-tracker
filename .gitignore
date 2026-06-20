@@ -5,4 +5,6 @@ database.sqlite
 database.sqlite-shm
 database.sqlite-wal
 node_modules/
+prisma/database.sqlite
+prisma/database.sqlite-journal
 .env

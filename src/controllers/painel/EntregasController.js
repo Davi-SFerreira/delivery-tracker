@@ -14,8 +14,9 @@ export class EntregasControllerPainel {
                 metadados: resultado
             });
         } catch (erro) {
+            console.error('ERRO REAL NO INDEX:', erro); //temporário
             req.flash('erro', 'Ocorreu um erro ao buscar as entregas.');
-            res.render('entregas/index', { entregas: [] });
+            res.render('entregas/index', { entregas: [], metadados: { total: 0, page: 1, totalPages: 1 } });
         }
     }
 
